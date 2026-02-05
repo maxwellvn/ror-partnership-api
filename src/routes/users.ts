@@ -62,11 +62,19 @@ users.put('/me/church-affiliation', validate(updateChurchAffiliationSchema), asy
     const { id } = c.get('user');
     const input = await c.req.json();
 
+    // Strip empty strings – Mongoose can't cast '' to ObjectId
+    const cleaned: Record<string, any> = {};
+    for (const [key, value] of Object.entries(input)) {
+      if (value !== '' && value != null) {
+        cleaned[key] = value;
+      }
+    }
+
     const user = await User.findByIdAndUpdate(
       id,
       {
         $set: {
-          churchAffiliation: input,
+          churchAffiliation: cleaned,
         },
       },
       { new: true }
