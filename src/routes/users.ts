@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { User, Transaction, Pledge } from '../models';
+import { User, Transaction, Pledge, RecurringPayment } from '../models';
 import { authMiddleware, validate } from '../middleware';
 import { successResponse, errorResponse, sanitizeUser } from '../utils';
 import { updateProfileSchema, updateChurchAffiliationSchema } from '@ror/shared';
@@ -141,7 +141,16 @@ users.get('/me/dashboard', async (c) => {
       currentMonthGiving: currentMonthResult[0]?.total || 0,
       activePledges,
       recentTransactions,
-      upcomingRecurring: [], // TODO: Implement recurring payments
+      upcomingRecurring: await RecurringPayment.find({
+        userId: id,
+        status: 'active',
+        'schedule.nextPaymentDate': {
+          $lte: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
+        },
+      })
+        .populate('categoryId', 'name code')
+        .sort({ 'schedule.nextPaymentDate': 1 })
+        .limit(5),
     });
   } catch (error: any) {
     return errorResponse(c, 'FETCH_FAILED', error.message, 500);
