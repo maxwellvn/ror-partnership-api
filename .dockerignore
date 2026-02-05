@@ -1,0 +1,61 @@
+# Dependencies
+node_modules
+**/node_modules
+.bun
+
+# Build outputs
+dist
+**/dist
+.next
+out
+
+# Environment files (use Docker env vars instead)
+.env
+.env.*
+!.env.example
+
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs
+
+# Test files
+coverage
+.nyc_output
+**/*.test.ts
+**/*.spec.ts
+__tests__
+
+# Documentation
+*.md
+!README.md
+docs
+
+# Mobile app (not needed for API deployment)
+apps/mobile
+apps/dashboard
+
+# Development files
+.editorconfig
+.eslintrc*
+.prettierrc*
+tsconfig*.json
+turbo.json
+
+# Temporary files
+tmp
+temp
+*.tmp
