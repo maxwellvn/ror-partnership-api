@@ -227,31 +227,50 @@ export class AuthService {
     });
 
     if (!user) {
-      const passwordHash = await bcrypt.hash(crypto.randomUUID(), config.bcryptRounds);
-      user = await User.create({
-        email,
-        passwordHash,
-        kingchatId,
-        kingchatAccessToken: accessToken,
-        kingchatRefreshToken: refreshToken,
-        isEmailVerified: true, // KingsChat users are auto-verified
-        profile: {
-          firstName,
-          lastName,
-          displayName,
-          avatar,
-        },
-        preferences: {
-          currency: 'NGN',
-          language: 'en',
-          notificationsEnabled: true,
-          emailUpdates: true,
-        },
-        status: 'active',
-        role: 'partner',
-        lastLoginAt: new Date(),
-      });
-    } else {
+      try {
+        const passwordHash = await bcrypt.hash(crypto.randomUUID(), config.bcryptRounds);
+        user = await User.create({
+          email,
+          passwordHash,
+          kingchatId,
+          kingchatAccessToken: accessToken,
+          kingchatRefreshToken: refreshToken,
+          isEmailVerified: true, // KingsChat users are auto-verified
+          profile: {
+            firstName,
+            lastName,
+            displayName,
+            avatar,
+          },
+          preferences: {
+            currency: 'NGN',
+            language: 'en',
+            notificationsEnabled: true,
+            emailUpdates: true,
+          },
+          status: 'active',
+          role: 'partner',
+          lastLoginAt: new Date(),
+        });
+      } catch (err: any) {
+        // Handle duplicate key error (race condition or existing user not matched by findOne)
+        if (err.code === 11000) {
+          user = await User.findOne({
+            $or: [
+              ...(kingchatId ? [{ kingchatId }] : []),
+              ...(email ? [{ email }] : []),
+            ],
+          });
+          if (!user) {
+            throw new Error('User conflict: unable to create or find account');
+          }
+        } else {
+          throw err;
+        }
+      }
+    }
+
+    if (user && !user.isNew) {
       user.kingchatId = kingchatId || user.kingchatId;
       user.kingchatAccessToken = accessToken;
       user.kingchatRefreshToken = refreshToken || user.kingchatRefreshToken;
