@@ -31,12 +31,10 @@ RUN addgroup --system --gid 1001 nodejs && \
 
 # Copy node_modules
 COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/packages/shared/node_modules ./packages/shared/node_modules 2>/dev/null || true
 
 # Copy source code
 COPY packages/shared ./packages/shared
 COPY src ./src
-COPY scripts ./scripts
 
 # Set ownership
 RUN chown -R bunjs:nodejs /app
