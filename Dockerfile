@@ -44,9 +44,5 @@ USER bunjs
 # Expose port
 EXPOSE 3000
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=10s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3000/v1/health || exit 1
-
 # Run TypeScript directly with Bun (no build step needed)
 CMD ["bun", "run", "src/index.ts"]
