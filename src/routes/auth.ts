@@ -111,30 +111,51 @@ auth.post('/kingschat/callback', async (c) => {
     const url = new URL(c.req.url);
     const appRedirect = url.searchParams.get('app_redirect') || '';
 
+    console.log('[KingsChat Callback] POST received');
+    console.log('[KingsChat Callback] app_redirect:', appRedirect);
+
     if (!appRedirect) {
       return errorResponse(c, 'KINGSCHAT_CALLBACK_MISSING_REDIRECT', 'Missing app_redirect', 400);
     }
 
     const contentType = c.req.header('content-type') || '';
+    console.log('[KingsChat Callback] Content-Type:', contentType);
+
     let bodyParams: Record<string, string> = {};
 
+    // Clone the request to read raw body for debugging and fallback parsing
+    const rawBody = await c.req.text();
+    console.log('[KingsChat Callback] Raw body:', rawBody);
+
     if (contentType.includes('application/json')) {
-      const body = await c.req.json();
-      Object.entries(body || {}).forEach(([key, value]) => {
-        if (value !== undefined && value !== null) {
-          bodyParams[key] = String(value);
-        }
-      });
-    } else {
-      const body = await c.req.parseBody();
-      Object.entries(body || {}).forEach(([key, value]) => {
-        if (Array.isArray(value)) {
-          bodyParams[key] = String(value[0]);
-        } else if (value !== undefined && value !== null) {
-          bodyParams[key] = String(value);
-        }
+      try {
+        const body = JSON.parse(rawBody);
+        Object.entries(body || {}).forEach(([key, value]) => {
+          if (value !== undefined && value !== null) {
+            bodyParams[key] = String(value);
+          }
+        });
+      } catch (e) {
+        console.error('[KingsChat Callback] JSON parse failed:', e);
+      }
+    } else if (rawBody && rawBody.includes('=')) {
+      // Parse as URL-encoded form data (handles application/x-www-form-urlencoded
+      // and cases where content-type might be missing or unexpected)
+      const formParams = new URLSearchParams(rawBody);
+      formParams.forEach((value, key) => {
+        bodyParams[key] = value;
       });
     }
+
+    // Also check URL query params from the POST request itself
+    // (KingsChat might send tokens as query params)
+    url.searchParams.forEach((value, key) => {
+      if (key !== 'app_redirect' && !bodyParams[key]) {
+        bodyParams[key] = value;
+      }
+    });
+
+    console.log('[KingsChat Callback] Parsed params:', JSON.stringify(bodyParams));
 
     const redirectUrl = new URL(appRedirect);
 
@@ -145,8 +166,12 @@ auth.post('/kingschat/callback', async (c) => {
       }
     });
 
-    return c.redirect(redirectUrl.toString(), 302);
+    const finalUrl = redirectUrl.toString();
+    console.log('[KingsChat Callback] Redirecting to:', finalUrl);
+
+    return c.redirect(finalUrl, 302);
   } catch (error: any) {
+    console.error('[KingsChat Callback] Error:', error);
     return errorResponse(c, 'KINGSCHAT_CALLBACK_FAILED', error.message || 'Callback failed', 500);
   }
 });
@@ -156,6 +181,10 @@ auth.get('/kingschat/callback', async (c) => {
   try {
     const url = new URL(c.req.url);
     const appRedirect = url.searchParams.get('app_redirect') || '';
+
+    console.log('[KingsChat Callback] GET received');
+    console.log('[KingsChat Callback] Full URL:', c.req.url);
+    console.log('[KingsChat Callback] app_redirect:', appRedirect);
 
     if (!appRedirect) {
       return errorResponse(c, 'KINGSCHAT_CALLBACK_MISSING_REDIRECT', 'Missing app_redirect', 400);
@@ -169,8 +198,13 @@ auth.get('/kingschat/callback', async (c) => {
       }
     });
 
-    return c.redirect(redirectUrl.toString(), 302);
+    const finalUrl = redirectUrl.toString();
+    console.log('[KingsChat Callback] GET params:', JSON.stringify(Object.fromEntries(url.searchParams)));
+    console.log('[KingsChat Callback] Redirecting to:', finalUrl);
+
+    return c.redirect(finalUrl, 302);
   } catch (error: any) {
+    console.error('[KingsChat Callback] GET Error:', error);
     return errorResponse(c, 'KINGSCHAT_CALLBACK_FAILED', error.message || 'Callback failed', 500);
   }
 });

@@ -7,6 +7,8 @@ import { emailService } from './email.service';
 
 export class AuthService {
   private async fetchKingChatProfile(accessToken: string) {
+    console.log('[KingsChat] Fetching profile from:', config.kingchat.apiUrl);
+
     const response = await fetch(config.kingchat.apiUrl, {
       method: 'GET',
       headers: {
@@ -17,12 +19,15 @@ export class AuthService {
 
     if (!response.ok) {
       const errorText = await response.text();
+      console.error('[KingsChat] Profile fetch failed:', response.status, errorText);
       throw new Error(
         `Failed to fetch KingsChat profile (status ${response.status}): ${errorText || 'unknown'}`
       );
     }
 
-    return response.json();
+    const profile = await response.json();
+    console.log('[KingsChat] Profile response:', JSON.stringify(profile, null, 2));
+    return profile;
   }
 
   private splitName(displayName?: string) {
@@ -189,26 +194,30 @@ export class AuthService {
     accessToken: string,
     refreshToken?: string
   ): Promise<{ user: IUser; tokens: ReturnType<typeof generateTokens> }> {
-    const profile = await this.fetchKingChatProfile(accessToken);
+    const rawProfile = await this.fetchKingChatProfile(accessToken);
 
-    const kingchatId = profile.id || profile.userId;
-    const email = profile.email?.toLowerCase();
-    const displayName =
-      profile.displayName ||
-      profile.display_name ||
-      profile.name ||
-      profile.username;
-    const avatar = profile.avatar || profile.profilePicture || profile.profile_picture;
+    // KingsChat API returns nested: { profile: { user: { user_id, name, email, username, avatar_url } } }
+    const kcProfile = rawProfile.profile || rawProfile;
+    const kcUser = kcProfile.user || {};
 
-    const firstFromProfile = profile.first_name || profile.firstName;
-    const lastFromProfile = profile.last_name || profile.lastName;
-    const { firstName, lastName } =
-      firstFromProfile || lastFromProfile
-        ? {
-            firstName: firstFromProfile || 'KingsChat',
-            lastName: lastFromProfile || 'User',
-          }
-        : this.splitName(displayName);
+    const kingchatId = kcUser.user_id || kcUser.id || rawProfile.id;
+
+    // Email can be a string or an object { address: "...", verified: true }
+    const rawEmail = kcUser.email || kcProfile.email || rawProfile.email;
+    const email = rawEmail
+      ? (typeof rawEmail === 'object' ? rawEmail.address : rawEmail)?.toLowerCase()
+      : undefined;
+
+    const displayName = kcUser.name || kcProfile.name || rawProfile.name;
+    const username = kcUser.username || kcProfile.username || rawProfile.username;
+    const avatar = kcUser.avatar_url || kcProfile.avatar_url || rawProfile.avatar;
+
+    const { firstName, lastName } = this.splitName(displayName);
+
+    console.log('[KingsChat] Extracted user data:', {
+      kingchatId, email, displayName, username, avatar,
+      firstName, lastName,
+    });
 
     let user = await User.findOne({
       $or: [
