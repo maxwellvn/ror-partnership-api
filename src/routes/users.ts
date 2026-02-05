@@ -1,7 +1,10 @@
 import { Hono } from 'hono';
+import bcrypt from 'bcrypt';
 import { User, Transaction, Pledge, RecurringPayment } from '../models';
 import { authMiddleware, validate } from '../middleware';
 import { successResponse, errorResponse, sanitizeUser } from '../utils';
+import { config } from '../config';
+import { emailService } from '../services/email.service';
 import { updateProfileSchema, updateChurchAffiliationSchema } from '@ror/shared';
 
 const users = new Hono();
@@ -74,6 +77,129 @@ users.put('/me/church-affiliation', validate(updateChurchAffiliationSchema), asy
     }
 
     return successResponse(c, { user: sanitizeUser(user) });
+  } catch (error: any) {
+    return errorResponse(c, 'UPDATE_FAILED', error.message, 500);
+  }
+});
+
+// Verify current password (for re-auth before sensitive changes)
+users.post('/me/verify-password', async (c) => {
+  try {
+    const { id } = c.get('user');
+    const { password } = await c.req.json();
+
+    if (!password) {
+      return errorResponse(c, 'VALIDATION_ERROR', 'Password is required', 400);
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      return errorResponse(c, 'USER_NOT_FOUND', 'User not found', 404);
+    }
+
+    if (!user.hasPassword) {
+      return errorResponse(c, 'NO_PASSWORD', 'No password set on this account', 400);
+    }
+
+    const valid = await bcrypt.compare(password, user.passwordHash);
+    if (!valid) {
+      return errorResponse(c, 'INVALID_PASSWORD', 'Incorrect password', 401);
+    }
+
+    return successResponse(c, { verified: true });
+  } catch (error: any) {
+    return errorResponse(c, 'VERIFY_FAILED', error.message, 500);
+  }
+});
+
+// Set or change password
+users.put('/me/password', async (c) => {
+  try {
+    const { id } = c.get('user');
+    const { currentPassword, newPassword } = await c.req.json();
+
+    if (!newPassword || newPassword.length < 8) {
+      return errorResponse(c, 'VALIDATION_ERROR', 'New password must be at least 8 characters', 400);
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      return errorResponse(c, 'USER_NOT_FOUND', 'User not found', 404);
+    }
+
+    // If user already has a password, require current password
+    if (user.hasPassword) {
+      if (!currentPassword) {
+        return errorResponse(c, 'VALIDATION_ERROR', 'Current password is required', 400);
+      }
+      const valid = await bcrypt.compare(currentPassword, user.passwordHash);
+      if (!valid) {
+        return errorResponse(c, 'INVALID_PASSWORD', 'Current password is incorrect', 401);
+      }
+    }
+
+    user.passwordHash = await bcrypt.hash(newPassword, config.bcryptRounds);
+    user.hasPassword = true;
+    await user.save();
+
+    return successResponse(c, { user: sanitizeUser(user) });
+  } catch (error: any) {
+    return errorResponse(c, 'UPDATE_FAILED', error.message, 500);
+  }
+});
+
+// Update email
+users.put('/me/email', async (c) => {
+  try {
+    const { id } = c.get('user');
+    const { email, password } = await c.req.json();
+
+    if (!email) {
+      return errorResponse(c, 'VALIDATION_ERROR', 'Email is required', 400);
+    }
+
+    const user = await User.findById(id);
+    if (!user) {
+      return errorResponse(c, 'USER_NOT_FOUND', 'User not found', 404);
+    }
+
+    // Require password verification
+    if (user.hasPassword) {
+      if (!password) {
+        return errorResponse(c, 'VALIDATION_ERROR', 'Password is required to change email', 400);
+      }
+      const valid = await bcrypt.compare(password, user.passwordHash);
+      if (!valid) {
+        return errorResponse(c, 'INVALID_PASSWORD', 'Incorrect password', 401);
+      }
+    }
+
+    // Check email not taken
+    const existing = await User.findOne({ email: email.toLowerCase(), _id: { $ne: id } });
+    if (existing) {
+      return errorResponse(c, 'EMAIL_TAKEN', 'An account with this email already exists', 409);
+    }
+
+    // Update email and require re-verification
+    const verificationCode = emailService.generateVerificationCode();
+    const verificationExpiry = new Date(Date.now() + config.verificationCodeExpiry);
+
+    user.email = email.toLowerCase();
+    user.isEmailVerified = false;
+    user.emailVerificationCode = verificationCode;
+    user.emailVerificationExpiry = verificationExpiry;
+    await user.save();
+
+    try {
+      await emailService.sendVerificationCode(email, verificationCode, user.profile.firstName);
+    } catch (err) {
+      console.error('Failed to send verification email:', err);
+    }
+
+    return successResponse(c, {
+      user: sanitizeUser(user),
+      requiresVerification: true,
+    });
   } catch (error: any) {
     return errorResponse(c, 'UPDATE_FAILED', error.message, 500);
   }

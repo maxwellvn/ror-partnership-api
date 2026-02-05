@@ -232,6 +232,7 @@ export class AuthService {
         user = await User.create({
           email,
           passwordHash,
+          hasPassword: false,
           kingchatId,
           kingchatAccessToken: accessToken,
           kingchatRefreshToken: refreshToken,

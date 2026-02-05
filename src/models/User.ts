@@ -4,6 +4,7 @@ export interface IUser extends Document {
   email: string;
   phone?: string;
   passwordHash: string;
+  hasPassword: boolean;
   isEmailVerified: boolean;
   isPhoneVerified: boolean;
   emailVerificationCode?: string;
@@ -64,6 +65,10 @@ const userSchema = new Schema<IUser>(
     passwordHash: {
       type: String,
       required: true,
+    },
+    hasPassword: {
+      type: Boolean,
+      default: true,
     },
     isEmailVerified: {
       type: Boolean,
