@@ -29,10 +29,9 @@ export const config = {
     apiKey: Bun.env.ESPEES_API_KEY || '',
   },
 
-  // KingChat OAuth
+  // KingChat OAuth (no client secret needed - public OAuth)
   kingchat: {
-    clientId: Bun.env.KINGCHAT_CLIENT_ID || '',
-    clientSecret: Bun.env.KINGCHAT_CLIENT_SECRET || '',
+    clientId: Bun.env.KINGCHAT_CLIENT_ID || 'com.kingschat',
     callbackUrl: Bun.env.KINGCHAT_CALLBACK_URL || '',
     apiUrl: Bun.env.KINGCHAT_API_URL || 'https://connect.kingsch.at/api/profile',
   },
