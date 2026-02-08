@@ -88,11 +88,19 @@ transactions.post('/give', validate(createTransactionSchema), async (c) => {
     });
 
     // Initialize payment with provider
-    const paymentResult = await paymentService.initializePayment(
-      transaction,
-      user.email,
-      input.paymentMethod
-    );
+    let paymentResult;
+    try {
+      paymentResult = await paymentService.initializePayment(
+        transaction,
+        user.email,
+        input.paymentMethod
+      );
+    } catch (paymentError: any) {
+      // Payment provider initialization failed — remove the pending transaction
+      await Transaction.findByIdAndDelete(transaction._id);
+      console.error('Payment initialization error:', paymentError);
+      return errorResponse(c, 'PAYMENT_INIT_FAILED', 'Failed to initialize payment. Please try again.', 502);
+    }
 
     // Update transaction with external reference
     transaction.externalRef = paymentResult.paymentData.reference;
@@ -192,6 +200,9 @@ transactions.get('/', async (c) => {
 
     if (query.status) {
       filter.status = query.status;
+    } else {
+      // By default, only show transactions that reached a final state
+      filter.status = { $in: ['completed', 'failed'] };
     }
 
     if (query.categoryId) {

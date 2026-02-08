@@ -18,6 +18,9 @@ export class PaymentService {
     transaction: ITransaction,
     email: string
   ): Promise<PaystackInitResponse> {
+    const appRedirect = `${config.mobileAppScheme}://give`;
+    const callbackUrl = `${config.apiUrl}/v1/payment/callback?app_redirect=${encodeURIComponent(appRedirect)}`;
+
     const response = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
       headers: {
@@ -29,7 +32,7 @@ export class PaymentService {
         amount: transaction.amount.value,
         currency: transaction.amount.currency,
         reference: transaction.transactionRef,
-        callback_url: `${config.apiUrl}/v1/payment/callback`,
+        callback_url: callbackUrl,
         metadata: {
           userId: transaction.userId.toString(),
           categoryId: transaction.category.categoryId.toString(),

@@ -19,6 +19,7 @@ import {
   recurringPaymentRoutes,
   campaignRoutes,
   offlineContributionRoutes,
+  paymentRoutes,
 } from './routes';
 
 // Initialize app
@@ -88,6 +89,7 @@ app.route('/notifications', notificationRoutes);
 app.route('/recurring-payments', recurringPaymentRoutes);
 app.route('/campaigns', campaignRoutes);
 app.route('/offline-contributions', offlineContributionRoutes);
+app.route('/payment', paymentRoutes);
 
 // Admin routes
 app.route('/admin', adminRoutes);

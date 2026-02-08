@@ -16,3 +16,4 @@ export { default as notificationRoutes } from './notifications';
 export { default as recurringPaymentRoutes } from './recurring-payments';
 export { default as campaignRoutes } from './campaigns';
 export { default as offlineContributionRoutes } from './offline-contributions';
+export { default as paymentRoutes } from './payment';
