@@ -62,7 +62,7 @@ export const createTransactionSchema = z.object({
   categoryId: z.string().min(1, 'Category ID is required'),
   amount: z.number().positive('Amount must be greater than 0'),
   currency: z.string().default('NGN'),
-  paymentMethod: z.enum(['paystack', 'espees', 'stripe']),
+  paymentMethod: z.enum(['paystack', 'espees', 'stripe']).default('paystack'),
 });
 
 export const completeTransactionSchema = z.object({
@@ -115,7 +115,7 @@ export const updatePledgeSchema = z.object({
 
 export const contributeToPledgeSchema = z.object({
   amount: z.number().positive('Amount must be greater than 0'),
-  paymentMethod: z.enum(['paystack', 'espees', 'stripe']),
+  paymentMethod: z.enum(['paystack', 'espees', 'stripe']).default('paystack'),
 });
 
 // Recurring Payment Schemas

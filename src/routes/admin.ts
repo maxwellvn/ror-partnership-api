@@ -234,6 +234,22 @@ admin.get('/transactions', async (c) => {
   }
 });
 
+admin.delete('/transactions/:id', async (c) => {
+  try {
+    const { id } = c.req.param();
+
+    const transaction = await Transaction.findByIdAndDelete(id);
+
+    if (!transaction) {
+      return errorResponse(c, 'TRANSACTION_NOT_FOUND', 'Transaction not found', 404);
+    }
+
+    return successResponse(c, { message: 'Transaction deleted successfully' });
+  } catch (error: any) {
+    return errorResponse(c, 'DELETE_FAILED', error.message, 500);
+  }
+});
+
 // ==================== Category Management ====================
 
 admin.get('/categories', async (c) => {
