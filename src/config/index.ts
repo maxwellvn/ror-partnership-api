@@ -17,12 +17,6 @@ export const config = {
     publicKey: Bun.env.PAYSTACK_PUBLIC_KEY || '',
   },
 
-  stripe: {
-    secretKey: Bun.env.STRIPE_SECRET_KEY || '',
-    publishableKey: Bun.env.STRIPE_PUBLISHABLE_KEY || '',
-    webhookSecret: Bun.env.STRIPE_WEBHOOK_SECRET || '',
-  },
-
   espees: {
     apiUrl: Bun.env.ESPEES_API_URL || '',
     merchantId: Bun.env.ESPEES_MERCHANT_ID || '',

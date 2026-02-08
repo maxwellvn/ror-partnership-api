@@ -79,12 +79,6 @@ export class PaymentService {
     return hash === signature;
   }
 
-  // Initialize Stripe payment (placeholder)
-  async initializeStripe(transaction: ITransaction): Promise<any> {
-    // TODO: Implement Stripe payment
-    throw new Error('Stripe integration not implemented');
-  }
-
   // Initialize Espees payment (placeholder)
   async initializeEspees(transaction: ITransaction): Promise<any> {
     // TODO: Implement Espees payment
@@ -95,7 +89,7 @@ export class PaymentService {
   async initializePayment(
     transaction: ITransaction,
     email: string,
-    method: 'paystack' | 'stripe' | 'espees'
+    method: 'paystack' | 'espees'
   ): Promise<PaymentInitResult> {
     switch (method) {
       case 'paystack':
@@ -103,12 +97,6 @@ export class PaymentService {
         return {
           provider: 'paystack',
           paymentData: paystackResult,
-        };
-      case 'stripe':
-        const stripeResult = await this.initializeStripe(transaction);
-        return {
-          provider: 'stripe',
-          paymentData: stripeResult,
         };
       case 'espees':
         const espeesResult = await this.initializeEspees(transaction);

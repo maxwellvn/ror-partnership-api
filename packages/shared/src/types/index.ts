@@ -59,7 +59,7 @@ export interface Transaction {
     displayValue: number;
   };
   payment: {
-    method: 'paystack' | 'espees' | 'stripe' | 'cash' | 'bank_transfer';
+    method: 'paystack' | 'espees' | 'cash' | 'bank_transfer';
     provider?: string;
     providerRef?: string;
     cardLast4?: string;
