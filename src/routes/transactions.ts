@@ -240,6 +240,29 @@ transactions.get('/:id', async (c) => {
   }
 });
 
+// Delete transaction (admin only)
+transactions.delete('/:id', async (c) => {
+  try {
+    const user = c.get('user');
+
+    if (!user || !['admin', 'super_admin'].includes(user.role)) {
+      return errorResponse(c, 'AUTH_INSUFFICIENT_PERMISSIONS', 'Admin access required', 403);
+    }
+
+    const { id } = c.req.param();
+
+    const transaction = await Transaction.findByIdAndDelete(id);
+
+    if (!transaction) {
+      return errorResponse(c, 'TRANSACTION_NOT_FOUND', 'Transaction not found', 404);
+    }
+
+    return successResponse(c, { message: 'Transaction deleted successfully' });
+  } catch (error: any) {
+    return errorResponse(c, 'DELETE_FAILED', error.message, 500);
+  }
+});
+
 // Get giving summary/statistics
 transactions.get('/summary/stats', async (c) => {
   try {
