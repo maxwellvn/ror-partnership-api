@@ -29,7 +29,7 @@ export class PaymentService {
         amount: transaction.amount.value,
         currency: transaction.amount.currency,
         reference: transaction.transactionRef,
-        callback_url: `${config.appUrl}/payment/callback`,
+        callback_url: `${config.apiUrl}/v1/payment/callback`,
         metadata: {
           userId: transaction.userId.toString(),
           categoryId: transaction.category.categoryId.toString(),
