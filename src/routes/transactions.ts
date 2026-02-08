@@ -103,7 +103,8 @@ transactions.post('/give', validate(createTransactionSchema), async (c) => {
     }
 
     // Update transaction with external reference
-    transaction.externalRef = paymentResult.paymentData.reference;
+    // For Stripe, store sessionId so the callback can look up the transaction
+    transaction.externalRef = paymentResult.paymentData.sessionId || paymentResult.paymentData.reference;
     await transaction.save();
 
     return successResponse(c, {
@@ -168,6 +169,40 @@ transactions.post('/give/complete', validate(completeTransactionSchema), async (
       await transaction.save();
 
       // Update category stats
+      await PartnershipCategory.findByIdAndUpdate(transaction.category.categoryId, {
+        $inc: {
+          'stats.totalContributions': 1,
+          'stats.totalAmount': transaction.amount.displayValue,
+        },
+        $set: {
+          'stats.lastUpdated': new Date(),
+        },
+      });
+    } else if (transaction.payment.method === 'stripe') {
+      // providerRef is the Stripe session ID for Stripe transactions
+      const stripeResult = await paymentService.verifyStripe(input.providerRef);
+
+      if (stripeResult.status !== 'success') {
+        transaction.status = 'failed';
+        transaction.statusHistory.push({
+          status: 'failed',
+          timestamp: new Date(),
+          reason: 'Stripe payment not completed',
+        });
+        await transaction.save();
+
+        return errorResponse(c, 'PAYMENT_FAILED', 'Payment verification failed', 402);
+      }
+
+      transaction.status = 'completed';
+      transaction.completedAt = new Date();
+      transaction.payment.providerRef = stripeResult.paymentIntent || input.providerRef;
+      transaction.statusHistory.push({
+        status: 'completed',
+        timestamp: new Date(),
+      });
+      await transaction.save();
+
       await PartnershipCategory.findByIdAndUpdate(transaction.category.categoryId, {
         $inc: {
           'stats.totalContributions': 1,

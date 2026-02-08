@@ -16,7 +16,7 @@ export interface ITransaction extends Document {
     displayValue: number;
   };
   payment: {
-    method: 'paystack' | 'espees' | 'cash' | 'bank_transfer';
+    method: 'paystack' | 'stripe' | 'espees' | 'cash' | 'bank_transfer';
     provider?: string;
     providerRef?: string;
     cardLast4?: string;
@@ -97,7 +97,7 @@ const transactionSchema = new Schema<ITransaction>(
     payment: {
       method: {
         type: String,
-        enum: ['paystack', 'espees', 'cash', 'bank_transfer'],
+        enum: ['paystack', 'stripe', 'espees', 'cash', 'bank_transfer'],
         required: true,
       },
       provider: String,
