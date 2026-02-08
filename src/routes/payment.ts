@@ -259,4 +259,95 @@ payment.get('/stripe/callback', async (c) => {
   }
 });
 
+// Paystack webhook — server-to-server confirmation of payment events.
+// This ensures transactions are completed even when the redirect callback
+// fails (e.g. user closes browser, network issue, deep-link not triggered).
+payment.post('/webhook/paystack', async (c) => {
+  try {
+    const rawBody = await c.req.text();
+    const signature = c.req.header('x-paystack-signature') || '';
+
+    // Verify webhook signature using HMAC-SHA512
+    const hmac = await crypto.subtle.importKey(
+      'raw',
+      new TextEncoder().encode(config.paystack.secretKey),
+      { name: 'HMAC', hash: 'SHA-512' },
+      false,
+      ['sign']
+    );
+    const signed = await crypto.subtle.sign(
+      'HMAC',
+      hmac,
+      new TextEncoder().encode(rawBody)
+    );
+    const computedSignature = Array.from(new Uint8Array(signed))
+      .map((b) => b.toString(16).padStart(2, '0'))
+      .join('');
+
+    if (computedSignature !== signature) {
+      return c.json({ error: 'Invalid signature' }, 401);
+    }
+
+    const payload = JSON.parse(rawBody);
+
+    if (payload.event !== 'charge.success') {
+      // We only care about successful charges
+      return c.json({ received: true }, 200);
+    }
+
+    const data = payload.data;
+    const reference = data.reference;
+
+    if (!reference) {
+      return c.json({ received: true }, 200);
+    }
+
+    const transaction = await Transaction.findOne({
+      $or: [{ transactionRef: reference }, { externalRef: reference }],
+    });
+
+    if (!transaction) {
+      console.warn('Webhook: transaction not found for reference:', reference);
+      return c.json({ received: true }, 200);
+    }
+
+    // Already completed — nothing to do
+    if (transaction.status === 'completed') {
+      return c.json({ received: true }, 200);
+    }
+
+    // Mark as completed
+    transaction.status = 'completed';
+    transaction.completedAt = new Date();
+    transaction.payment.providerRef = data.reference;
+    transaction.payment.cardLast4 = data.authorization?.last4;
+    transaction.payment.cardBrand = data.authorization?.brand;
+    transaction.statusHistory.push({
+      status: 'completed',
+      timestamp: new Date(),
+    });
+    await transaction.save();
+
+    // Update category stats
+    await PartnershipCategory.findByIdAndUpdate(
+      transaction.category.categoryId,
+      {
+        $inc: {
+          'stats.totalContributions': 1,
+          'stats.totalAmount': transaction.amount.displayValue,
+        },
+        $set: {
+          'stats.lastUpdated': new Date(),
+        },
+      }
+    );
+
+    return c.json({ received: true }, 200);
+  } catch (error: any) {
+    console.error('Paystack webhook error:', error);
+    // Return 200 so Paystack doesn't retry endlessly on unexpected errors
+    return c.json({ received: true }, 200);
+  }
+});
+
 export default payment;

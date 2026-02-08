@@ -1,5 +1,6 @@
 import { Hono } from 'hono';
 import bcrypt from 'bcrypt';
+import mongoose from 'mongoose';
 import { User, Transaction, Pledge, RecurringPayment } from '../models';
 import { authMiddleware, validate } from '../middleware';
 import { successResponse, errorResponse, sanitizeUser } from '../utils';
@@ -217,12 +218,13 @@ users.put('/me/email', async (c) => {
 users.get('/me/dashboard', async (c) => {
   try {
     const { id } = c.get('user');
+    const userObjectId = new mongoose.Types.ObjectId(id);
 
     // Get total giving
     const totalGivingResult = await Transaction.aggregate([
       {
         $match: {
-          userId: id,
+          userId: userObjectId,
           status: 'completed',
         },
       },
@@ -242,7 +244,7 @@ users.get('/me/dashboard', async (c) => {
     const currentMonthResult = await Transaction.aggregate([
       {
         $match: {
-          userId: id,
+          userId: userObjectId,
           status: 'completed',
           createdAt: { $gte: startOfMonth },
         },
@@ -254,6 +256,40 @@ users.get('/me/dashboard', async (c) => {
         },
       },
     ]);
+
+    // Get weekly trend for the current week (last 7 days)
+    const sevenDaysAgo = new Date();
+    sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 6);
+    sevenDaysAgo.setHours(0, 0, 0, 0);
+
+    const weeklyTrendResult = await Transaction.aggregate([
+      {
+        $match: {
+          userId: userObjectId,
+          status: 'completed',
+          createdAt: { $gte: sevenDaysAgo },
+        },
+      },
+      {
+        $group: {
+          _id: {
+            $dateToString: { format: '%Y-%m-%d', date: '$createdAt' },
+          },
+          amount: { $sum: '$amount.displayValue' },
+        },
+      },
+      { $sort: { _id: 1 } },
+    ]);
+
+    // Build a full 7-day array with zeros for missing days
+    const weeklyTrend: Array<{ date: string; amount: number }> = [];
+    for (let i = 0; i < 7; i++) {
+      const d = new Date(sevenDaysAgo);
+      d.setDate(d.getDate() + i);
+      const dateStr = d.toISOString().split('T')[0];
+      const match = weeklyTrendResult.find((r: any) => r._id === dateStr);
+      weeklyTrend.push({ date: dateStr, amount: match?.amount || 0 });
+    }
 
     // Get active pledges
     const activePledges = await Pledge.find({
@@ -273,6 +309,7 @@ users.get('/me/dashboard', async (c) => {
     return successResponse(c, {
       totalGiving: totalGivingResult[0]?.total || 0,
       currentMonthGiving: currentMonthResult[0]?.total || 0,
+      weeklyTrend,
       activePledges,
       recentTransactions,
       upcomingRecurring: await RecurringPayment.find({
